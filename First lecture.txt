@@ -1,0 +1,74 @@
+Course name ->HCCDA:Ai
+huwawei cloud computing development association Artificial intelligence 
+
+WHat is cloud : Anything on the internet caha vo koi storage i.e(Google Drive ) / caha computing i.e(Internet pr kisi b jaga hum computing resources use kre jaisa hum coding krte ha kisi b online jaga jaisa goggle collab , OneCompiler , Programiz    jb hum code krte ha us mei hamai ram graphic card or storage b milti ha .. vo sb cloud ki madad se ho ra hota ha  kyu ka hamara system itna advance hota nae jitni advance chezai vo cloud provide krra hota ha  ) /caha software i.e(canva kyu ka vo online pra howa ja isi liya vo to hamri ram use nae krta online kam krta ha mtlb vo b cloud pr hota hei ..
+isi liya vo cloud software ha )
+
+jo b cloud software hei us mei cloud comuting b use ho gi or storage cloud b use hota ha 
+
+Cloud computing (Infrastructure as a service -> mtlb ap ko srf hardware mila ha i.e Salad Platform 2) Amazon -> EC2 Elastic Computing )/(Platform As a Service -> Mtlb hardware ka sth pora platform b mila i.e Google Colab )
+Software Cloud (Software as a Service i.e Google Docs  )
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+I propose to consider the question "can machines think?"           (Alan Turing 1950) ->  is ki detail (is na kaha ka 1)mental Behaviour)
+
+The branch of computer science concered wih making cimputers behave like Human     (John McCarthy 1956)  -> is ki detail (insan ka 2 behaviour ha 1)Physical Behaviour (i.e Robots) 2)Mental behaviour )
+
+The science of making machines do things that would require intelligence if done by man   (Marvin Minsky) -> is ki detail (Machine Learning ->1980 mei ayi thi  /Deep Learning ->2010 me ayi thi ye )
+
+
+what are intellingence of humans ? with respect to ai ?
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------First Digital Computer 1945 (ENIAC) 
+WORLD wAR (1939-1945) is se digital computer or ai ka kiya relation ha ?
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+Ai kaha kaha use ho ra -> Computer Science  Brain Science , Cognitive Science , Psychology , Linguistic , Logic, Philosophy
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+Symbolism , Connectionism , Behaviourism    in pr search krna ha .. ye Human Behaviour ha .
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+Koi b AI is Flowchart se hi chlti ha ke ye ye ho ga AI in processes ko hi use kre gi 
+ ---------------
+ |  Application |                            is ki example ha Face Unlock In Mobile  ( sara AI is flowchart USe krte ha ) 
+ ---------------
+        |                                    hum na sb sa asan example li ha jaisa porani example li taka zyadaa asani se smj ska (Face id Unlock )
+  ------------
+ |  Algorithm |                              Hum ne Algorithm prhna ha is course mei 
+ -------------
+        |
+   ----------
+    |Device |
+   ----------
+        |
+ ---------------
+  |   Chip      |
+ ---------------
+        |
+ ---------------
+  |  Process |
+ ---------------
+        |
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+Types of AI
+1) Strong AI -> ye asa ha suppose keh ye human se b zyada inteeligent ho ga lkn abi tk aya nae ye 
+2) Weak AI -> Abi tk sara INSAN SE KM INTELLIGENT HE .
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+ANI(Artifical Narrow Intelligence) -> (asa AI jo srf ik hi  perspective sa hamara msla hul kre  jaisa face unlock srf face ko hi unlock kre ga kxh or nae kre ga )
+AGI(Artificial General Intelligence) -> (asa AI jo keh hur kam kr lei vo face b detect krra ho finger b detect krra ho means hur kam kre us ko general kehta ha . Chatgpt IS near to general  lkn hei nae kafi chezai kr deta )
+ASI(Artifical Super Intelligence ) -> (Asa ai jo sara kam krta ho or human se zyada intelligent ho ke krta ho )
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+Application Domains Of AI : Computer Vision -> vo tamam application jo dekh kr sekhti he (camera)
+Speech Processing -> Jo AI sun ke sekhai (Microphone)
+Natural Language Processing -> Prh Kr sekhta ha 
+
+Visual Intelligence – dekhna (images/video samajhna, jese face recognition)
+Auditory Intelligence – sunna (voice recognition, sound detect karna)
+Olfactory Intelligence – sungna (smell)
+Gustatory Intelligence – chakhna (taste — food industry mein flavor testing ke liye)                                                                         
+Haptic Intelligence – chuna (touch) 
+
+jb react na kre koi to mtlb otism hota ha jiasa bacha ha vo mobile me laga ha vo outism ki trf ja ra mtlb ka vo us wqt koi  reaction nae de ra hota 
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+Traffic analysis : jo malls ma AI ka software hota ha is mei 1)Stock Management 2)Quality Management ye sb chezai ati ha
+Action Analysis
+Authentication 
+Smart Album 
+Image Search 
