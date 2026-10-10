@@ -1,0 +1,942 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3f5f3">
+  <title>Form &amp; Function | Calculator</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f3f5f3;
+      --surface: #ffffff;
+      --ink: #222b29;
+      --muted: #78817d;
+      --line: #e7ebe8;
+      --accent: #167d68;
+      --accent-soft: #e5f2ed;
+      --key: #f5f7f5;
+      --shadow: 0 24px 70px rgba(38, 57, 49, .11), 0 3px 10px rgba(38, 57, 49, .05);
+      font-family: "Aptos", "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-width: 0;
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 32px 18px;
+      color: var(--ink);
+      background-color: var(--paper);
+      background-image: radial-gradient(#dbe4de 0.7px, transparent 0.7px);
+      background-size: 18px 18px;
+    }
+
+    .calculator {
+      width: min(100%, 640px);
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, .8);
+      border-radius: 24px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      animation: arrive .45s ease-out both;
+    }
+
+    @keyframes arrive {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 22px 24px 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 28px;
+      height: 28px;
+      place-items: center;
+      border-radius: 9px;
+      color: white;
+      background: var(--accent);
+      font-family: Georgia, serif;
+      font-size: 17px;
+      font-style: italic;
+    }
+
+    .brand small {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .mode-switch {
+      display: flex;
+      gap: 2px;
+      padding: 3px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #f8f9f8;
+    }
+
+    .mode-switch button {
+      min-width: 40px;
+      height: 27px;
+      border: 0;
+      border-radius: 6px;
+      color: var(--muted);
+      background: transparent;
+      font: inherit;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .mode-switch button[aria-pressed="true"] {
+      color: var(--accent);
+      background: white;
+      box-shadow: 0 1px 3px rgba(30, 45, 39, .12);
+    }
+
+    .view-nav {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      margin: 0 20px 14px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: #f7f9f7;
+    }
+
+    .view-nav button {
+      min-height: 34px;
+      border: 0;
+      border-radius: 7px;
+      color: var(--muted);
+      background: transparent;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    .view-nav button[aria-selected="true"] {
+      color: var(--accent);
+      background: white;
+      box-shadow: 0 1px 3px rgba(30, 45, 39, .1);
+    }
+
+    .view-nav button:focus-visible, .tool-button:focus-visible,
+    .tool-field input:focus-visible, .tool-field select:focus-visible,
+    .unit-switch button:focus-visible {
+      outline: 3px solid rgba(22, 125, 104, .28);
+      outline-offset: 2px;
+    }
+
+    .view[hidden] { display: none; }
+
+    .display {
+      min-height: 142px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 14px 25px 20px;
+      border-top: 1px solid #f2f4f2;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(145deg, #fbfcfb, #f7faf8);
+    }
+
+    .display-label {
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    #expression {
+      width: 100%;
+      min-height: 42px;
+      padding: 0;
+      border: 0;
+      outline: 0;
+      color: var(--ink);
+      background: transparent;
+      font: 400 30px/1.25 "Aptos", "Segoe UI", sans-serif;
+      text-align: right;
+      caret-color: var(--accent);
+    }
+
+    #expression::placeholder { color: #b7bfbb; }
+
+    .result-line {
+      min-height: 22px;
+      margin-top: 5px;
+      color: var(--accent);
+      font-size: 15px;
+      font-weight: 600;
+      text-align: right;
+      overflow-wrap: anywhere;
+    }
+
+    .result-line.error { color: #bd5146; font-size: 12px; }
+
+    .keypad { padding: 16px 18px 19px; }
+
+    .scientific-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 7px;
+      padding: 15px 18px 0;
+    }
+
+    .scientific-grid .key { height: 39px; font-size: 11px; }
+
+    .view-content { padding: 12px 24px 22px; }
+
+    .view-title {
+      margin: 8px 0 17px;
+      font-size: 19px;
+      font-weight: 650;
+    }
+
+    .tool-row {
+      display: flex;
+      align-items: end;
+      gap: 12px;
+      margin: 14px 0;
+    }
+
+    .tool-field { display: grid; flex: 1; gap: 6px; min-width: 0; }
+
+    .tool-field label, .tool-label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .tool-field input, .tool-field select {
+      width: 100%;
+      min-height: 40px;
+      padding: 0 11px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--ink);
+      background: #fbfcfb;
+      font: inherit;
+      font-size: 14px;
+    }
+
+    .unit-switch {
+      display: flex;
+      gap: 3px;
+      padding: 3px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #f7f9f7;
+    }
+
+    .unit-switch button {
+      min-height: 30px;
+      padding: 0 10px;
+      border: 0;
+      border-radius: 6px;
+      color: var(--muted);
+      background: transparent;
+      font: inherit;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .unit-switch button[aria-pressed="true"] {
+      color: var(--accent);
+      background: white;
+      box-shadow: 0 1px 3px rgba(30, 45, 39, .1);
+    }
+
+    .angle-summary {
+      margin: 12px 0 18px;
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .section-label {
+      margin: 24px 0 8px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .value-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .value-table th, .value-table td { padding: 9px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+    .value-table th { color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; }
+    .value-table td:last-child, .value-table th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+    .value-table td:first-child { font-weight: 600; }
+
+    .tool-button {
+      min-height: 40px;
+      padding: 0 16px;
+      border: 0;
+      border-radius: 8px;
+      color: white;
+      background: var(--accent);
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .tool-button:hover { background: #116d5b; }
+
+    .tool-result {
+      min-height: 44px;
+      margin-top: 15px;
+      padding: 12px 13px;
+      border-left: 3px solid var(--accent);
+      color: var(--accent);
+      background: #f3f8f5;
+      font-size: 13px;
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+
+    .tool-result.error { border-color: #bd5146; color: #a33f36; background: #fcf5f4; }
+
+    .tool-hint { margin: 7px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+
+    .history { padding: 0 18px 16px; border-top: 1px solid var(--line); }
+    .history summary { padding: 13px 0 4px; color: var(--muted); font-size: 12px; font-weight: 650; cursor: pointer; }
+    .history ol { display: grid; gap: 7px; margin: 10px 0 0; padding-left: 20px; color: var(--ink); font-size: 12px; }
+    .history li { padding-left: 3px; overflow-wrap: anywhere; }
+
+    .key-row {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 9px;
+      margin-bottom: 9px;
+    }
+
+    .key-row:last-child { margin-bottom: 0; }
+
+    .key {
+      min-width: 0;
+      height: 51px;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      color: var(--ink);
+      background: var(--key);
+      font: 500 16px/1 "Aptos", "Segoe UI", sans-serif;
+      cursor: pointer;
+      transition: transform .12s ease, background .12s ease, box-shadow .12s ease;
+      touch-action: manipulation;
+    }
+
+    .key:hover { background: #eaf0ec; }
+    .key:active { transform: scale(.96); }
+    .key:focus-visible, .mode-switch button:focus-visible {
+      outline: 3px solid rgba(22, 125, 104, .28);
+      outline-offset: 2px;
+    }
+
+    .key.function {
+      color: #37675b;
+      background: #eef5f1;
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .key.operator {
+      color: var(--accent);
+      background: var(--accent-soft);
+      font-size: 20px;
+    }
+
+    .key.utility {
+      color: #6c7772;
+      background: #f0f2f0;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .key.equals {
+      color: white;
+      background: var(--accent);
+      font-size: 20px;
+      box-shadow: 0 4px 9px rgba(22, 125, 104, .2);
+    }
+
+    .key.equals:hover { background: #116d5b; }
+
+    .footer {
+      padding: 0 18px 17px;
+      color: #9aa29e;
+      font-size: 10px;
+      text-align: center;
+    }
+
+    @media (max-width: 380px) {
+      body { padding: 14px 10px; }
+      .topbar { padding-right: 18px; padding-left: 18px; }
+      .keypad { padding-right: 13px; padding-left: 13px; }
+      .scientific-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); padding-right: 13px; padding-left: 13px; }
+      .key-row { gap: 7px; }
+      .key { height: 48px; border-radius: 10px; }
+      #expression { font-size: 27px; }
+      .view-content { padding-right: 17px; padding-left: 17px; }
+      .tool-row { gap: 8px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="calculator" aria-label="Scientific calculator">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">ƒ</span>
+        <span>FORM &amp; FUNCTION<small>Scientific calculator</small></span>
+      </div>
+      <div class="mode-switch" role="group" aria-label="Angle mode">
+        <button type="button" data-mode="DEG" aria-pressed="true">DEG</button>
+        <button type="button" data-mode="RAD" aria-pressed="false">RAD</button>
+      </div>
+    </header>
+
+    <nav class="view-nav" role="tablist" aria-label="Calculator tools">
+      <button type="button" role="tab" id="tab-calculator" aria-selected="true" aria-controls="view-calculator" data-view="calculator">Calculator</button>
+      <button type="button" role="tab" id="tab-trigonometry" aria-selected="false" aria-controls="view-trigonometry" data-view="trigonometry">Trigonometry</button>
+      <button type="button" role="tab" id="tab-calculus" aria-selected="false" aria-controls="view-calculus" data-view="calculus">Calculus</button>
+    </nav>
+
+    <section class="view" id="view-calculator" role="tabpanel" aria-labelledby="tab-calculator">
+      <section class="display" aria-label="Calculator display">
+        <label class="display-label" for="expression">Expression</label>
+        <input id="expression" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="0" aria-label="Expression">
+        <output id="result" class="result-line" aria-live="polite"></output>
+      </section>
+      <div class="scientific-grid" aria-label="Scientific functions">
+        <button class="key function" data-insert="sin(" aria-label="Sine">sin</button>
+        <button class="key function" data-insert="cos(" aria-label="Cosine">cos</button>
+        <button class="key function" data-insert="tan(" aria-label="Tangent">tan</button>
+        <button class="key function" data-insert="cot(" aria-label="Cotangent">cot</button>
+        <button class="key function" data-insert="sec(" aria-label="Secant">sec</button>
+        <button class="key function" data-insert="csc(" aria-label="Cosecant">csc</button>
+        <button class="key function" data-insert="asin(" aria-label="Inverse sine">sin⁻¹</button>
+        <button class="key function" data-insert="acos(" aria-label="Inverse cosine">cos⁻¹</button>
+        <button class="key function" data-insert="atan(" aria-label="Inverse tangent">tan⁻¹</button>
+        <button class="key function" data-insert="acot(" aria-label="Inverse cotangent">cot⁻¹</button>
+        <button class="key function" data-insert="sinh(" aria-label="Hyperbolic sine">sinh</button>
+        <button class="key function" data-insert="cosh(" aria-label="Hyperbolic cosine">cosh</button>
+        <button class="key function" data-insert="tanh(" aria-label="Hyperbolic tangent">tanh</button>
+        <button class="key function" data-insert="asinh(" aria-label="Inverse hyperbolic sine">asinh</button>
+        <button class="key function" data-insert="acosh(" aria-label="Inverse hyperbolic cosine">acosh</button>
+        <button class="key function" data-insert="atanh(" aria-label="Inverse hyperbolic tangent">atanh</button>
+        <button class="key function" data-insert="log(" aria-label="Base-10 logarithm">log</button>
+        <button class="key function" data-insert="ln(" aria-label="Natural logarithm">ln</button>
+        <button class="key function" data-insert="exp(" aria-label="Exponential">exp</button>
+        <button class="key function" data-insert="sqrt(" aria-label="Square root">√</button>
+        <button class="key function" data-insert="fact(" aria-label="Factorial">n!</button>
+        <button class="key function" data-insert="abs(" aria-label="Absolute value">abs</button>
+        <button class="key function" data-insert="floor(" aria-label="Floor">floor</button>
+        <button class="key function" data-insert="ceil(" aria-label="Ceiling">ceil</button>
+        <button class="key function" data-insert="pow(" aria-label="Power function">pow</button>
+        <button class="key function" data-insert="radians(" aria-label="Convert degrees to radians">radians</button>
+        <button class="key function" data-insert="degrees(" aria-label="Convert radians to degrees">degrees</button>
+      </div>
+      <section class="keypad" aria-label="Calculator keys">
+        <div class="key-row">
+          <button class="key utility" data-action="clear">AC</button>
+          <button class="key utility" data-action="delete" aria-label="Delete last character">DEL</button>
+          <button class="key function" data-insert="(">(</button>
+          <button class="key function" data-insert=")">)</button>
+          <button class="key function" data-insert="%">%</button>
+        </div>
+        <div class="key-row">
+          <button class="key" data-insert="7">7</button><button class="key" data-insert="8">8</button>
+          <button class="key" data-insert="9">9</button><button class="key operator" data-insert="/" aria-label="Divide">÷</button>
+          <button class="key operator" data-insert="*" aria-label="Multiply">×</button>
+        </div>
+        <div class="key-row">
+          <button class="key" data-insert="4">4</button><button class="key" data-insert="5">5</button>
+          <button class="key" data-insert="6">6</button><button class="key operator" data-insert="-" aria-label="Subtract">−</button>
+          <button class="key function" data-insert="^">xʸ</button>
+        </div>
+        <div class="key-row">
+          <button class="key" data-insert="1">1</button><button class="key" data-insert="2">2</button>
+          <button class="key" data-insert="3">3</button><button class="key operator" data-insert="+" aria-label="Add">+</button>
+          <button class="key equals" data-action="equals" aria-label="Calculate">=</button>
+        </div>
+        <div class="key-row">
+          <button class="key" data-insert="0">0</button><button class="key" data-insert=".">.</button>
+          <button class="key function" data-insert="pi">π</button><button class="key function" data-insert="e">e</button>
+          <button class="key function" data-insert="ans">ANS</button>
+        </div>
+      </section>
+      <details class="history"><summary>History</summary><ol id="history-list"></ol></details>
+    </section>
+
+    <section class="view view-content" id="view-trigonometry" role="tabpanel" aria-labelledby="tab-trigonometry" hidden>
+      <h1 class="view-title">Trigonometric ratios</h1>
+      <div class="tool-row">
+        <div class="tool-field"><label for="trig-angle">Angle θ</label><input id="trig-angle" type="number" value="30" step="any"></div>
+        <div class="unit-switch" role="group" aria-label="Angle unit">
+          <button type="button" data-trig-unit="DEG" aria-pressed="true">Degrees</button>
+          <button type="button" data-trig-unit="RAD" aria-pressed="false">Radians</button>
+        </div>
+      </div>
+      <div id="angle-summary" class="angle-summary"></div>
+      <table class="value-table"><thead><tr><th>Function</th><th>Value</th></tr></thead><tbody id="trig-values"></tbody></table>
+      <h2 class="section-label">Inverse trigonometry</h2>
+      <div class="tool-row"><div class="tool-field"><label for="inverse-value">Value</label><input id="inverse-value" type="number" value="0.5" step="any"></div></div>
+      <table class="value-table"><thead><tr><th>Function</th><th>Degrees</th><th>Radians</th></tr></thead><tbody id="inverse-values"></tbody></table>
+    </section>
+
+    <section class="view view-content" id="view-calculus" role="tabpanel" aria-labelledby="tab-calculus" hidden>
+      <h1 class="view-title">Numerical calculus</h1>
+      <div class="tool-field"><label for="calculus-function">Function f(x)</label><input id="calculus-function" type="text" value="sin x" autocomplete="off" spellcheck="false"></div>
+      <p class="tool-hint">Use x or theta as the variable. Trigonometric functions use radians.</p>
+      <div class="tool-row"><div class="tool-field">
+        <label for="calculus-operation">Operation</label>
+        <select id="calculus-operation">
+          <option value="derivative">Derivative f'(x)</option>
+          <option value="second">Second derivative f''(x)</option>
+          <option value="integral">Definite integral</option>
+        </select>
+      </div></div>
+      <div class="tool-row" id="calculus-point-row"><div class="tool-field"><label for="calculus-point">Point x</label><input id="calculus-point" type="text" value="pi/4" autocomplete="off"></div></div>
+      <div class="tool-row" id="calculus-limits-row" hidden>
+        <div class="tool-field"><label for="calculus-lower">Lower limit a</label><input id="calculus-lower" type="text" value="0" autocomplete="off"></div>
+        <div class="tool-field"><label for="calculus-upper">Upper limit b</label><input id="calculus-upper" type="text" value="pi" autocomplete="off"></div>
+      </div>
+      <button class="tool-button" id="calculate-calculus" type="button">Calculate</button>
+      <output class="tool-result" id="calculus-result" aria-live="polite">Enter a function and calculate.</output>
+    </section>
+    <footer class="footer">Type anywhere in the calculator · Enter to calculate · Esc to clear</footer>
+  </main>
+
+  <script>
+    const expression = document.querySelector("#expression");
+    const result = document.querySelector("#result");
+    let angleMode = "DEG";
+    let justCalculated = false;
+    let lastAnswer = 0;
+
+    function tokenize(source) {
+      source = source.replace(/[×]/g, "*").replace(/[÷]/g, "/").replace(/[−]/g, "-")
+        .replace(/[π]/g, "pi").replace(/[θ]/g, "theta").replace(/[√]/g, "sqrt ");
+      let open = 0;
+      for (const character of source) {
+        if (character === "(") open += 1;
+        if (character === ")") open -= 1;
+      }
+      if (open > 0) source += ")".repeat(open);
+      const tokens = [];
+      let index = 0;
+      while (index < source.length) {
+        if (/\s/.test(source[index])) { index += 1; continue; }
+        const rest = source.slice(index);
+        const number = rest.match(/^(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?/i);
+        const identifier = rest.match(/^[a-z]+/i);
+        if (number) {
+          tokens.push({ type: "number", value: Number(number[0]) });
+          index += number[0].length;
+        } else if (identifier) {
+          tokens.push({ type: "identifier", value: identifier[0].toLowerCase() });
+          index += identifier[0].length;
+        } else if ("+-*/%^(),!".includes(source[index])) {
+          tokens.push({ type: source[index], value: source[index] });
+          index += 1;
+        } else {
+          throw new Error("Use numbers, operators, brackets, and supported functions.");
+        }
+      }
+      return tokens;
+    }
+
+    const functionNames = new Set([
+      "sin", "cos", "tan", "cot", "sec", "csc", "asin", "acos", "atan", "acot",
+      "sinh", "cosh", "tanh", "asinh", "acosh", "atanh", "sqrt", "log", "ln",
+      "exp", "fact", "abs", "floor", "ceil", "pow", "radians", "degrees"
+    ]);
+
+    function factorial(value) {
+      if (!Number.isInteger(value) || value < 0 || value > 170) throw new Error("Factorial needs an integer from 0 to 170.");
+      let answer = 1;
+      for (let factor = 2; factor <= value; factor += 1) answer *= factor;
+      return answer;
+    }
+
+    function evaluate(source, variables = {}, mode = angleMode) {
+      const tokens = tokenize(source);
+      let position = 0;
+      const peek = () => tokens[position];
+      const take = (type) => {
+        if (peek()?.type !== type) throw new Error("Check the expression and brackets.");
+        return tokens[position++];
+      };
+
+      function parseExpression() {
+        let value = parseTerm();
+        while (peek()?.type === "+" || peek()?.type === "-") {
+          const operator = tokens[position++].type;
+          const right = parseTerm();
+          value = operator === "+" ? value + right : value - right;
+        }
+        return value;
+      }
+
+      function parseTerm() {
+        let value = parseUnary();
+        while (["*", "/"].includes(peek()?.type) || startsValue(peek())) {
+          const operator = ["*", "/"].includes(peek()?.type) ? tokens[position++].type : "*";
+          const right = parseUnary();
+          if (operator === "/" && right === 0) throw new Error("Cannot divide by zero.");
+          value = operator === "*" ? value * right : value / right;
+        }
+        return value;
+      }
+
+      function startsValue(token) {
+        return token && ["number", "identifier", "("].includes(token.type);
+      }
+
+      function parseUnary() {
+        if (peek()?.type === "+") { position += 1; return parseUnary(); }
+        if (peek()?.type === "-") { position += 1; return -parseUnary(); }
+        return parsePower();
+      }
+
+      function parsePower() {
+        let value = parsePrimary();
+        if (peek()?.type === "^") {
+          position += 1;
+          value = Math.pow(value, parseUnary());
+        }
+        while (peek()?.type === "%" || peek()?.type === "!") {
+          const operator = tokens[position++].type;
+          value = operator === "%" ? value / 100 : factorial(value);
+        }
+        return value;
+      }
+
+      function applyFunction(name, input, second) {
+        const angle = mode === "DEG" ? input * Math.PI / 180 : input;
+        const fromRadians = (value) => mode === "DEG" ? value * 180 / Math.PI : value;
+        const divide = (numerator, denominator) => {
+          if (Math.abs(denominator) < 1e-12) throw new Error("Function is undefined at this value.");
+          return numerator / denominator;
+        };
+        switch (name) {
+          case "sin": return Math.sin(angle);
+          case "cos": return Math.cos(angle);
+          case "tan": return divide(Math.sin(angle), Math.cos(angle));
+          case "cot": return divide(Math.cos(angle), Math.sin(angle));
+          case "sec": return divide(1, Math.cos(angle));
+          case "csc": return divide(1, Math.sin(angle));
+          case "asin": return fromRadians(Math.asin(input));
+          case "acos": return fromRadians(Math.acos(input));
+          case "atan": return fromRadians(Math.atan(input));
+          case "acot": return fromRadians(Math.atan2(1, input));
+          case "sinh": return Math.sinh(input);
+          case "cosh": return Math.cosh(input);
+          case "tanh": return Math.tanh(input);
+          case "asinh": return Math.asinh(input);
+          case "acosh": return Math.acosh(input);
+          case "atanh": return Math.atanh(input);
+          case "sqrt": return Math.sqrt(input);
+          case "log": return Math.log10(input);
+          case "ln": return Math.log(input);
+          case "exp": return Math.exp(input);
+          case "fact": return factorial(input);
+          case "abs": return Math.abs(input);
+          case "floor": return Math.floor(input);
+          case "ceil": return Math.ceil(input);
+          case "pow":
+            if (second === undefined) throw new Error("pow needs two values, such as pow(2, 3).");
+            return Math.pow(input, second);
+          case "radians": return input * Math.PI / 180;
+          case "degrees": return input * 180 / Math.PI;
+          default: throw new Error("Unknown function.");
+        }
+      }
+
+      function parsePrimary() {
+        const token = peek();
+        if (!token) throw new Error("Enter an expression.");
+        if (token.type === "number") { position += 1; return token.value; }
+        if (token.type === "(") {
+          position += 1;
+          const value = parseExpression();
+          take(")");
+          return value;
+        }
+        if (token.type === "identifier") {
+          position += 1;
+          if (token.value === "pi") return Math.PI;
+          if (token.value === "e") return Math.E;
+          if (token.value === "ans") return lastAnswer;
+          if (Object.hasOwn(variables, token.value)) return variables[token.value];
+          if (!functionNames.has(token.value)) throw new Error(`Unknown name: ${token.value}`);
+          const parenthesized = peek()?.type === "(";
+          let input;
+          let second;
+          if (parenthesized) {
+            position += 1;
+            input = parseExpression();
+            if (peek()?.type === ",") { position += 1; second = parseExpression(); }
+            take(")");
+          } else {
+            input = parseUnary();
+          }
+          return applyFunction(token.value, input, second);
+        }
+        throw new Error("Check the expression and brackets.");
+      }
+
+      if (tokens.length === 0) throw new Error("Enter an expression.");
+      const value = parseExpression();
+      if (position !== tokens.length) throw new Error("Check the expression and brackets.");
+      if (!Number.isFinite(value)) throw new Error("Result is outside the supported range.");
+      return value;
+    }
+
+    function showResult() {
+      const source = expression.value.trim();
+      if (!source) {
+        result.textContent = "";
+        result.classList.remove("error");
+        return;
+      }
+      try {
+        const value = evaluate(source);
+        result.textContent = `= ${formatValue(value, 12)}`;
+        result.classList.remove("error");
+      } catch (error) {
+        result.textContent = error.message;
+        result.classList.add("error");
+      }
+    }
+
+    function insert(value) {
+      if (justCalculated && /[0-9.(a-z]/i.test(value[0])) expression.value = "";
+      const start = expression.selectionStart ?? expression.value.length;
+      const end = expression.selectionEnd ?? start;
+      expression.setRangeText(value, start, end, "end");
+      justCalculated = false;
+      showResult();
+      expression.focus({ preventScroll: true });
+    }
+
+    function calculate() {
+      showResult();
+      if (!result.classList.contains("error") && result.textContent) {
+        const original = expression.value;
+        lastAnswer = evaluate(original);
+        expression.value = formatValue(lastAnswer, 12);
+        result.textContent = `= ${expression.value}`;
+        const item = document.createElement("li");
+        item.textContent = `${original} = ${expression.value}`;
+        const history = document.querySelector("#history-list");
+        history.prepend(item);
+        while (history.children.length > 10) history.lastElementChild.remove();
+        justCalculated = true;
+      }
+      expression.focus({ preventScroll: true });
+    }
+
+    function clear() {
+      expression.value = "";
+      result.textContent = "";
+      result.classList.remove("error");
+      justCalculated = false;
+      expression.focus({ preventScroll: true });
+    }
+
+    document.querySelectorAll("[data-insert]").forEach((button) => {
+      button.addEventListener("click", () => insert(button.dataset.insert));
+    });
+    document.querySelectorAll('[data-action="clear"]').forEach((button) => button.addEventListener("click", clear));
+    document.querySelector('[data-action="delete"]').addEventListener("click", () => {
+      const start = expression.selectionStart ?? expression.value.length;
+      const end = expression.selectionEnd ?? start;
+      if (start !== end) expression.setRangeText("", start, end, "end");
+      else if (start > 0) expression.setRangeText("", start - 1, start, "end");
+      justCalculated = false;
+      showResult();
+      expression.focus({ preventScroll: true });
+    });
+    document.querySelector('[data-action="equals"]').addEventListener("click", calculate);
+    document.querySelectorAll("[data-mode]").forEach((button) => {
+      button.addEventListener("click", () => {
+        angleMode = button.dataset.mode;
+        document.querySelectorAll("[data-mode]").forEach((modeButton) => {
+          modeButton.setAttribute("aria-pressed", String(modeButton === button));
+        });
+        showResult();
+        expression.focus({ preventScroll: true });
+      });
+    });
+    expression.addEventListener("input", () => { justCalculated = false; showResult(); });
+
+    function formatValue(value, digits = 10) {
+      if (Math.abs(value) < 1e-12) return "0";
+      return Number(value.toPrecision(digits)).toString();
+    }
+
+    let trigUnit = "DEG";
+    function updateTrigonometry() {
+      const value = Number(document.querySelector("#trig-angle").value);
+      const summary = document.querySelector("#angle-summary");
+      const rows = document.querySelector("#trig-values");
+      if (!Number.isFinite(value)) { summary.textContent = "Enter a valid angle."; rows.replaceChildren(); return; }
+      const radians = trigUnit === "DEG" ? value * Math.PI / 180 : value;
+      const degrees = radians * 180 / Math.PI;
+      summary.textContent = `θ = ${formatValue(degrees, 8)}° = ${formatValue(radians, 8)} rad`;
+      rows.replaceChildren();
+      for (const [name, label] of [["sin", "sin θ"], ["cos", "cos θ"], ["tan", "tan θ"], ["cot", "cot θ"], ["sec", "sec θ"], ["csc", "csc θ"]]) {
+        const row = document.createElement("tr");
+        const functionCell = document.createElement("td");
+        const valueCell = document.createElement("td");
+        functionCell.textContent = label;
+        try { valueCell.textContent = formatValue(evaluate(`${name}(${value})`, {}, trigUnit)); }
+        catch { valueCell.textContent = "undefined"; }
+        row.append(functionCell, valueCell);
+        rows.append(row);
+      }
+
+      const inverseValue = Number(document.querySelector("#inverse-value").value);
+      const inverseRows = document.querySelector("#inverse-values");
+      inverseRows.replaceChildren();
+      if (!Number.isFinite(inverseValue)) return;
+      const inverseFunctions = [];
+      if (inverseValue >= -1 && inverseValue <= 1) {
+        inverseFunctions.push(["asin(v)", Math.asin(inverseValue)], ["acos(v)", Math.acos(inverseValue)]);
+      }
+      inverseFunctions.push(["atan(v)", Math.atan(inverseValue)], ["acot(v)", Math.atan2(1, inverseValue)]);
+      for (const [label, angle] of inverseFunctions) {
+        const row = document.createElement("tr");
+        for (const text of [label, formatValue(angle * 180 / Math.PI, 8), formatValue(angle, 8)]) {
+          const cell = document.createElement("td");
+          cell.textContent = text;
+          row.append(cell);
+        }
+        inverseRows.append(row);
+      }
+    }
+
+    function derivative(fn, point, step = 1e-3) {
+      return (-fn(point + 2 * step) + 8 * fn(point + step) - 8 * fn(point - step) + fn(point - 2 * step)) / (12 * step);
+    }
+
+    function secondDerivative(fn, point, step = 1e-3) {
+      return (fn(point + step) - 2 * fn(point) + fn(point - step)) / (step * step);
+    }
+
+    function integrate(fn, lower, upper, intervals = 2000) {
+      const step = (upper - lower) / intervals;
+      let total = fn(lower) + fn(upper);
+      for (let index = 1; index < intervals; index += 1) total += (index % 2 ? 4 : 2) * fn(lower + index * step);
+      return total * step / 3;
+    }
+
+    function runCalculus() {
+      const output = document.querySelector("#calculus-result");
+      const source = document.querySelector("#calculus-function").value.trim();
+      const operation = document.querySelector("#calculus-operation").value;
+      const pointText = document.querySelector("#calculus-point").value;
+      const lowerText = document.querySelector("#calculus-lower").value;
+      const upperText = document.querySelector("#calculus-upper").value;
+      try {
+        const fn = (value) => evaluate(source, { x: value, theta: value }, "RAD");
+        if (operation === "integral") {
+          const lower = evaluate(lowerText, {}, "RAD");
+          const upper = evaluate(upperText, {}, "RAD");
+          output.textContent = `Integral from ${lowerText} to ${upperText} = ${formatValue(integrate(fn, lower, upper), 8)}`;
+        } else {
+          const point = evaluate(pointText, {}, "RAD");
+          const answer = operation === "derivative" ? derivative(fn, point) : secondDerivative(fn, point);
+          const label = operation === "derivative" ? "f'" : "f''";
+          output.textContent = `${label}(${pointText}) = ${formatValue(answer, 8)}`;
+        }
+        output.classList.remove("error");
+      } catch (error) {
+        output.textContent = error.message || "Check the function, point, and limits.";
+        output.classList.add("error");
+      }
+    }
+
+    document.querySelectorAll("[data-view]").forEach((tab) => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll("[data-view]").forEach((item) => item.setAttribute("aria-selected", String(item === tab)));
+        document.querySelectorAll(".view").forEach((panel) => { panel.hidden = panel.id !== `view-${tab.dataset.view}`; });
+      });
+    });
+    document.querySelectorAll("[data-trig-unit]").forEach((button) => {
+      button.addEventListener("click", () => {
+        trigUnit = button.dataset.trigUnit;
+        document.querySelectorAll("[data-trig-unit]").forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
+        updateTrigonometry();
+      });
+    });
+    document.querySelector("#trig-angle").addEventListener("input", updateTrigonometry);
+    document.querySelector("#inverse-value").addEventListener("input", updateTrigonometry);
+    document.querySelector("#calculus-operation").addEventListener("change", (event) => {
+      const integral = event.target.value === "integral";
+      document.querySelector("#calculus-point-row").hidden = integral;
+      document.querySelector("#calculus-limits-row").hidden = !integral;
+    });
+    document.querySelector("#calculate-calculus").addEventListener("click", runCalculus);
+    updateTrigonometry();
+
+    document.addEventListener("keydown", (event) => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const active = document.activeElement;
+      if (active.matches("input, textarea, select") && active !== expression) return;
+      if (active.closest("[role='tab']") && event.key !== "Escape") return;
+      if (!active.closest("#view-calculator") && active !== expression && event.key !== "Escape") return;
+      if (event.key === "Enter" || event.key === "=") {
+        event.preventDefault();
+        calculate();
+        return;
+      }
+      if (event.key === "Escape") { event.preventDefault(); clear(); return; }
+      if (event.key === "Backspace" && document.activeElement !== expression) {
+        event.preventDefault();
+        const position = expression.value.length;
+        expression.setRangeText("", Math.max(0, position - 1), position, "end");
+        showResult();
+        expression.focus({ preventScroll: true });
+        return;
+      }
+      if (document.activeElement !== expression && /^[0-9a-z.+\-*/%^()]$/i.test(event.key)) {
+        event.preventDefault();
+        insert(event.key);
+      }
+    });
+
+    window.addEventListener("load", () => expression.focus({ preventScroll: true }));
+  </script>
+</body>
+</html>
