@@ -1,6 +1,8 @@
 
 import math
+from pathlib import Path
 import streamlit as st
+import streamlit.components.v1 as components
 
 def safe_div(num, den):
     if abs(den) < 1e-12:
@@ -184,10 +186,11 @@ def press(key):
 
 st.title("🧮 Scientific Calculator")
 
-tab1, tab2, tab3 = st.tabs([
+tab1, tab2, tab3, tab4 = st.tabs([
     "Calculator",
     "Trigonometry",
-    "Calculus"
+    "Calculus",
+    "Web Calculator",
 ])
 
 with tab1:
@@ -380,3 +383,7 @@ with tab3:
                 "Expression, point ya limits check karein. "
                 "Function wahan defined nahi ho sakta."
             )
+
+with tab4:
+    calculator_html = Path(__file__).with_name("calculator.html").read_text(encoding="utf-8")
+    components.html(calculator_html, height=1100, scrolling=True)
