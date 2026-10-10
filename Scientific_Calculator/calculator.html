@@ -185,8 +185,6 @@
       caret-color: var(--accent);
     }
 
-    #expression::placeholder { color: #b7bfbb; }
-
     .result-line {
       min-height: 22px;
       margin-top: 5px;
@@ -433,7 +431,7 @@
     <section class="view" id="view-calculator" role="tabpanel" aria-labelledby="tab-calculator">
       <section class="display" aria-label="Calculator display">
         <label class="display-label" for="expression">Expression</label>
-        <input id="expression" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="0" aria-label="Expression">
+        <input id="expression" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Expression">
         <output id="result" class="result-line" aria-live="polite"></output>
       </section>
       <div class="scientific-grid" aria-label="Scientific functions">
