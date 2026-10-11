@@ -1,275 +1,1068 @@
-import math
-import re
+"""
+Scientific Calculator — Single-file Streamlit app
+All HTML, CSS, and JavaScript are embedded in this file.
+No external assets required; deploys cleanly on Streamlit Community Cloud.
+"""
+
 import streamlit as st
+import streamlit.components.v1 as components
 
-FUNCS = ("asinh|acosh|atanh|sinh|cosh|tanh|asin|acos|atan|acot|sin|cos|tan|cot|sec|csc|"
-         "sqrt|log|ln|exp|fact|abs|floor|ceil|pow|radians|degrees")
-NUM = r"(?:\d+\.?\d*(?:[eE][-+]?\d+)?|\.\d+)"
-OPERATORS = "+-×÷*/^%"
+# ---------------------------------------------------------------------------
+# Page config (must be first Streamlit call)
+# ---------------------------------------------------------------------------
+st.set_page_config(
+    page_title="Scientific Calculator",
+    page_icon="🧮",
+    layout="centered",
+)
 
-def safe_div(num, den):
-    if abs(den) < 1e-12:
-        raise ZeroDivisionError("undefined")
-    return num / den
+# ---------------------------------------------------------------------------
+# Hide default Streamlit chrome so the calculator fills the viewport cleanly
+# ---------------------------------------------------------------------------
+st.markdown(
+    """
+    <style>
+        .block-container { padding-top: 1rem; padding-bottom: 0; }
+        footer { visibility: hidden; }
+        header { visibility: hidden; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
+# ---------------------------------------------------------------------------
+# Full self-contained calculator HTML / CSS / JS
+# ---------------------------------------------------------------------------
+CALCULATOR_HTML = r"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scientific Calculator</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f3f5f3;
+      --surface: #ffffff;
+      --ink: #222b29;
+      --muted: #78817d;
+      --line: #e7ebe8;
+      --accent: #167d68;
+      --accent-soft: #e5f2ed;
+      --key: #f5f7f5;
+      --shadow: 0 24px 70px rgba(38,57,49,.11), 0 3px 10px rgba(38,57,49,.05);
+      font-family: "Segoe UI", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-def build_env(mode):
-    if mode == "DEG":
-        to_rad = math.radians
-        from_rad = math.degrees
-    else:
-        to_rad = lambda x: x
-        from_rad = lambda x: x
-
-    def clean_trig(value):
-        if abs(value) < 1e-12:
-            return 0.0
-        if abs(value - 1) < 1e-12:
-            return 1.0
-        if abs(value + 1) < 1e-12:
-            return -1.0
-        return value
-
-    sin_ = lambda x: clean_trig(math.sin(to_rad(x)))
-    cos_ = lambda x: clean_trig(math.cos(to_rad(x)))
-
-    return {
-        "sin": sin_,
-        "cos": cos_,
-        "tan": lambda x: safe_div(sin_(x), cos_(x)),
-        "cot": lambda x: safe_div(cos_(x), sin_(x)),
-        "sec": lambda x: safe_div(1, cos_(x)),
-        "csc": lambda x: safe_div(1, sin_(x)),
-        "asin": lambda x: from_rad(math.asin(x)),
-        "acos": lambda x: from_rad(math.acos(x)),
-        "atan": lambda x: from_rad(math.atan(x)),
-        "acot": lambda x: from_rad(math.atan2(1, x)),
-        "sinh": math.sinh, "cosh": math.cosh, "tanh": math.tanh,
-        "asinh": math.asinh, "acosh": math.acosh, "atanh": math.atanh,
-        "log": math.log10, "ln": math.log, "sqrt": math.sqrt,
-        "exp": math.exp, "fact": math.factorial, "abs": abs,
-        "pow": math.pow, "floor": math.floor, "ceil": math.ceil,
-        "radians": math.radians, "degrees": math.degrees,
-        "pi": math.pi, "e": math.e,
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 14px 30px;
+      color: var(--ink);
+      background: var(--paper);
+      background-image: radial-gradient(#dbe4de 0.7px, transparent 0.7px);
+      background-size: 18px 18px;
     }
 
+    /* ── Calculator card ── */
+    .calculator {
+      width: min(100%, 660px);
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.8);
+      border-radius: 24px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      animation: arrive .4s ease-out both;
+    }
+    @keyframes arrive {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
 
-def prepare(text):
-    text = (text.replace("×", "*").replace("÷", "/").replace("^", "**")
-                .replace("π", "pi").replace("θ", "theta").replace("√", "sqrt "))
-    text = re.sub(rf"({NUM})\s*%", r"(\1/100)", text)
-    text = re.sub(r"(?<=[\d.)])\s*(?=[a-zA-Z(])(?![eE][-+]?\d)", "*", text)
-    text = re.sub(
-        rf"(?<![A-Za-z])({FUNCS})(?![A-Za-z])\s*(?!\()([-+]?(?:{NUM}|pi\b|e\b|x\b|theta\b))",
-        r"\1(\2)", text)
-    text = re.sub(r"\b(pi|e|x|theta)\b\s*(?=[\d(a-zA-Z])", r"\1*", text)
-    return text + ")" * (text.count("(") - text.count(")"))
+    /* ── Top bar ── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 22px 14px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .3px;
+    }
+    .brand-mark {
+      display: grid;
+      width: 30px; height: 30px;
+      place-items: center;
+      border-radius: 9px;
+      color: white;
+      background: var(--accent);
+      font-family: Georgia, serif;
+      font-size: 18px;
+      font-style: italic;
+    }
+    .brand small {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+    }
 
+    /* ── DEG / RAD toggle ── */
+    .mode-switch {
+      display: flex;
+      gap: 2px;
+      padding: 3px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #f8f9f8;
+    }
+    .mode-switch button {
+      min-width: 42px; height: 27px;
+      border: 0; border-radius: 6px;
+      color: var(--muted);
+      background: transparent;
+      font: inherit; font-size: 10px; font-weight: 700;
+      cursor: pointer; transition: all .15s;
+    }
+    .mode-switch button[aria-pressed="true"] {
+      color: var(--accent);
+      background: white;
+      box-shadow: 0 1px 4px rgba(30,45,39,.13);
+    }
 
-def safe_eval(text, env, extra=None):
-    if "__" in text or len(text) > 300:
-        raise ValueError("not allowed")
-    scope = {"__builtins__": {}, **env}
-    if extra:
-        scope.update(extra)
-    result = eval(prepare(text), scope)
-    if isinstance(result, complex) or not isinstance(result, (int, float)):
-        raise ValueError("not a number")
-    return result
+    /* ── Tab nav ── */
+    .view-nav {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      margin: 0 18px 12px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: #f7f9f7;
+    }
+    .view-nav button {
+      min-height: 34px;
+      border: 0; border-radius: 7px;
+      color: var(--muted);
+      background: transparent;
+      font: inherit; font-size: 12px; font-weight: 650;
+      cursor: pointer; transition: all .15s;
+    }
+    .view-nav button[aria-selected="true"] {
+      color: var(--accent);
+      background: white;
+      box-shadow: 0 1px 4px rgba(30,45,39,.1);
+    }
 
+    /* ── Panels ── */
+    .view[hidden] { display: none !important; }
 
-def fmt(value, digits=10, tol=1e-12):
-    if abs(value) < tol:
-        return "0"
-    return f"{value:.{digits}g}"
+    /* ── Display ── */
+    .display {
+      min-height: 118px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 12px 22px 18px;
+      border-top: 1px solid #f2f4f2;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(145deg, #fbfcfb, #f5f8f6);
+    }
+    .display-label {
+      margin-bottom: 10px;
+      color: var(--muted);
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .6px;
+    }
+    #expression {
+      width: 100%;
+      min-height: 40px;
+      border: 0; outline: 0; padding: 0;
+      color: var(--ink);
+      background: transparent;
+      font: 400 28px/1.3 "Segoe UI", system-ui, sans-serif;
+      text-align: right;
+      caret-color: var(--accent);
+    }
+    .result-line {
+      min-height: 22px;
+      margin-top: 5px;
+      color: var(--accent);
+      font-size: 15px; font-weight: 600;
+      text-align: right;
+      overflow-wrap: anywhere;
+    }
+    .result-line.error { color: #bd5146; font-size: 12px; }
 
+    /* ── Scientific function grid ── */
+    .sci-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 6px;
+      padding: 14px 18px 6px;
+    }
+    .sci-grid .key { height: 38px; font-size: 11px; }
 
-def evaluate(text, mode):
-    try:
-        return fmt(safe_eval(text, build_env(mode))), ""
-    except ZeroDivisionError:
-        return "", "Error: undefined / zero se divide"
-    except Exception:
-        return "", "Error: expression sahi nahi"
+    /* ── Main keypad ── */
+    .keypad { padding: 10px 18px 18px; }
+    .key-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .key-row:last-child { margin-bottom: 0; }
 
+    /* ── Keys ── */
+    .key {
+      min-width: 0; height: 50px;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      color: var(--ink);
+      background: var(--key);
+      font: 500 15px/1 "Segoe UI", system-ui, sans-serif;
+      cursor: pointer;
+      transition: transform .1s, background .1s, box-shadow .1s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .key:hover { background: #eaf0ec; }
+    .key:active { transform: scale(.94); }
+    .key:focus-visible {
+      outline: 3px solid rgba(22,125,104,.3);
+      outline-offset: 2px;
+    }
+    .key.function {
+      color: #2e6b5d; background: #eef5f1;
+      font-size: 12px; font-weight: 650;
+    }
+    .key.operator {
+      color: var(--accent); background: var(--accent-soft);
+      font-size: 20px;
+    }
+    .key.utility {
+      color: #6c7772; background: #eff1f0;
+      font-size: 12px; font-weight: 700;
+    }
+    .key.equals {
+      color: white; background: var(--accent);
+      font-size: 22px;
+      box-shadow: 0 4px 10px rgba(22,125,104,.22);
+    }
+    .key.equals:hover { background: #116d5b; }
 
-def derivative(f, x, h=1e-3):
-    return (-f(x + 2*h) + 8*f(x + h) - 8*f(x - h) + f(x - 2*h)) / (12 * h)
+    /* ── History ── */
+    .history-wrap {
+      padding: 0 18px 16px;
+      border-top: 1px solid var(--line);
+    }
+    .history-wrap summary {
+      padding: 12px 0 4px;
+      color: var(--muted); font-size: 12px; font-weight: 650;
+      cursor: pointer; user-select: none;
+    }
+    #history-list {
+      display: grid; gap: 6px;
+      margin: 8px 0 0; padding-left: 18px;
+      color: var(--ink); font-size: 12px;
+    }
+    #history-list li { overflow-wrap: anywhere; }
 
+    /* ── Trig / Calculus panel shared ── */
+    .view-content { padding: 12px 22px 24px; }
+    .view-title { margin: 8px 0 16px; font-size: 19px; font-weight: 700; }
+    .section-label {
+      margin: 20px 0 8px;
+      color: var(--muted); font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .5px;
+    }
 
-def second_derivative(f, x, h=1e-3):
-    return (f(x + h) - 2 * f(x) + f(x - h)) / h**2
+    .tool-row {
+      display: flex; align-items: flex-end; gap: 12px; margin: 12px 0;
+    }
+    .tool-field { display: grid; flex: 1; gap: 5px; min-width: 0; }
+    .tool-field label {
+      color: var(--muted); font-size: 11px; font-weight: 650;
+    }
+    .tool-field input, .tool-field select {
+      width: 100%; min-height: 40px; padding: 0 11px;
+      border: 1px solid var(--line); border-radius: 8px;
+      color: var(--ink); background: #fbfcfb;
+      font: inherit; font-size: 14px;
+    }
+    .tool-field input:focus, .tool-field select:focus {
+      outline: 2px solid rgba(22,125,104,.35); border-color: var(--accent);
+    }
 
+    .unit-switch {
+      display: flex; gap: 3px; padding: 3px;
+      border: 1px solid var(--line); border-radius: 9px; background: #f7f9f7;
+    }
+    .unit-switch button {
+      min-height: 30px; padding: 0 10px;
+      border: 0; border-radius: 6px;
+      color: var(--muted); background: transparent;
+      font: inherit; font-size: 11px; cursor: pointer; transition: all .15s;
+    }
+    .unit-switch button[aria-pressed="true"] {
+      color: var(--accent); background: white;
+      box-shadow: 0 1px 3px rgba(30,45,39,.1);
+    }
 
-def integrate(f, a, b, n=2000):
-    h = (b - a) / n
-    total = f(a) + f(b)
-    for i in range(1, n):
-        total += (4 if i % 2 else 2) * f(a + i * h)
-    return total * h / 3
+    .angle-summary {
+      margin: 10px 0 16px;
+      color: var(--accent); font-size: 13px; font-weight: 600;
+    }
 
+    .value-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .value-table th, .value-table td {
+      padding: 8px 8px; border-bottom: 1px solid var(--line); text-align: left;
+    }
+    .value-table th {
+      color: var(--muted); font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .4px;
+    }
+    .value-table td:last-child, .value-table th:last-child {
+      text-align: right; font-variant-numeric: tabular-nums;
+    }
+    .value-table td:first-child { font-weight: 600; }
 
-st.set_page_config(page_title="Scientific Calculator", page_icon="🧮")
+    .tool-button {
+      min-height: 40px; padding: 0 20px; margin-top: 14px;
+      border: 0; border-radius: 8px;
+      color: white; background: var(--accent);
+      font: inherit; font-size: 13px; font-weight: 700;
+      cursor: pointer; transition: background .15s;
+    }
+    .tool-button:hover { background: #116d5b; }
 
-defaults = {"expr": "", "ans": "", "done_expr": None, "error_for": None,
-            "history": []}
-for key, value in defaults.items():
-    if key not in st.session_state:
-        st.session_state[key] = value
-def finish():
-    s = st.session_state
-    if not s.expr.strip() or s.done_expr == s.expr:
-        return
-    value, error = evaluate(s.expr, s.mode)
-    if error:
-        s.error_for = s.expr
-        return
-    s.ans = value
-    s.done_expr = s.expr
-    s.history.append(f"{s.expr} = {value}")
+    .tool-result {
+      min-height: 44px; margin-top: 14px; padding: 12px 14px;
+      border-left: 3px solid var(--accent);
+      color: var(--accent); background: #f2f8f5;
+      font-size: 13px; font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+    .tool-result.error { border-color: #bd5146; color: #a33f36; background: #fcf4f3; }
 
+    .tool-hint { margin-top: 6px; color: var(--muted); font-size: 11px; line-height: 1.55; }
 
-def press(key):
-    s = st.session_state
-    if key == "C":
-        s.expr = ""
-        s.done_expr = None
-        return
-    if key == "DEL":
-        s.expr = re.sub(r"(?:[a-z]+\(?\s*|.)$", "", s.expr)
-        s.done_expr = None
-        return
-    if key == "=":
-        finish()
-        return
-    text = s.ans if key == "ANS" else key
-    if not text:
-        return
-    if s.done_expr is not None and s.expr == s.done_expr:
-        is_operator = key != "ANS" and text[0] in OPERATORS
-        s.expr = s.ans + text if is_operator else text
-    else:
-        s.expr += text
-    s.done_expr = None
+    /* ── Footer ── */
+    .calc-footer {
+      padding: 0 18px 15px;
+      color: #9aa29e; font-size: 10px; text-align: center;
+    }
 
+    /* ── Responsive ── */
+    @media (max-width: 380px) {
+      body { padding: 10px 8px 20px; }
+      .sci-grid { grid-template-columns: repeat(4, 1fr); padding: 10px 12px 4px; }
+      .key-row { gap: 6px; }
+      .keypad { padding: 8px 12px 14px; }
+      .key { height: 46px; border-radius: 10px; }
+      #expression { font-size: 24px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        transition-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="calculator" aria-label="Scientific calculator">
 
-BUTTONS = [
-    [("sin", "sin "), ("cos", "cos "), ("tan", "tan "), ("cot", "cot "), ("sec", "sec ")],
-    [("csc", "csc "), ("sin⁻¹", "asin "), ("cos⁻¹", "acos "), ("tan⁻¹", "atan "), ("cot⁻¹", "acot ")],
-    [("sinh", "sinh "), ("cosh", "cosh "), ("tanh", "tanh "), ("log", "log "), ("ln", "ln ")],
-    [("√", "sqrt "), ("x²", "^2"), ("xʸ", "^"), ("n!", "fact "), ("exp", "exp ")],
-    [("π", "pi"), ("e", "e"), ("(", "("), (")", ")"), ("%", "%")],
-    [("7", "7"), ("8", "8"), ("9", "9"), ("÷", "÷"), ("DEL", "DEL")],
-    [("4", "4"), ("5", "5"), ("6", "6"), ("×", "×"), ("C", "C")],
-    [("1", "1"), ("2", "2"), ("3", "3"), ("−", "-"), ("ANS", "ANS")],
-    [("0", "0"), (".", "."), ("abs", "abs "), ("+", "+"), ("=", "=")],
-]
-MORE_BUTTONS = [
-    [("asinh", "asinh "), ("acosh", "acosh "), ("atanh", "atanh "), ("floor", "floor "), ("ceil", "ceil ")],
-    [("pow", "pow("), ("radians", "radians "), ("degrees", "degrees ")],
-]
+    <!-- Top bar: brand + DEG/RAD -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">&#x192;</span>
+        <span>SCIENTIFIC<small>Calculator</small></span>
+      </div>
+      <div class="mode-switch" role="group" aria-label="Angle mode">
+        <button type="button" data-mode="DEG" aria-pressed="true">DEG</button>
+        <button type="button" data-mode="RAD" aria-pressed="false">RAD</button>
+      </div>
+    </header>
 
-st.title("Scientific Calculator")
-web_module, = st.tabs(["Web Calculator"])
-with web_module:
-    tab1, tab2, tab3 = st.tabs(["Calculator", "Trigonometry", "Calculus"])
+    <!-- Tab navigation -->
+    <nav class="view-nav" role="tablist" aria-label="Sections">
+      <button type="button" role="tab" aria-selected="true"
+              data-view="calculator" id="tab-calc">Calculator</button>
+      <button type="button" role="tab" aria-selected="false"
+              data-view="trigonometry" id="tab-trig">Trigonometry</button>
+      <button type="button" role="tab" aria-selected="false"
+              data-view="calculus" id="tab-calc2">Calculus</button>
+    </nav>
 
-with tab1:
-    st.radio("Angle mode", ["DEG", "RAD"], horizontal=True, key="mode")
-    st.text_input("Expression", key="expr")
+    <!-- ═══════════════════════ CALCULATOR TAB ═══════════════════════ -->
+    <section class="view" id="view-calculator"
+             role="tabpanel" aria-labelledby="tab-calc">
 
-    if st.session_state.expr.strip():
-        shown, error = evaluate(st.session_state.expr, st.session_state.mode)
-    else:
-        shown, error = "", ""
-    if shown:
-        st.markdown(f"### = {shown}")
-    elif error and st.session_state.error_for == st.session_state.expr:
-        st.error(error)
+      <!-- Display -->
+      <div class="display" aria-label="Calculator display">
+        <div class="display-label">Expression</div>
+        <input id="expression" type="text" inputmode="decimal"
+               autocomplete="off" spellcheck="false"
+               aria-label="Expression" autofocus>
+        <output id="result" class="result-line" aria-live="polite"></output>
+      </div>
 
-    for r, row in enumerate(BUTTONS):
-        cols = st.columns(len(row))
-        for c, (label, value) in enumerate(row):
-            cols[c].button(label, key=f"btn_{r}_{c}", on_click=press,
-                           args=(value,), use_container_width=True)
+      <!-- Scientific function grid (3 rows x 6) -->
+      <div class="sci-grid" aria-label="Scientific functions">
+        <button class="key function" data-insert="sin("  aria-label="Sine">sin</button>
+        <button class="key function" data-insert="cos("  aria-label="Cosine">cos</button>
+        <button class="key function" data-insert="tan("  aria-label="Tangent">tan</button>
+        <button class="key function" data-insert="cot("  aria-label="Cotangent">cot</button>
+        <button class="key function" data-insert="sec("  aria-label="Secant">sec</button>
+        <button class="key function" data-insert="csc("  aria-label="Cosecant">csc</button>
 
-    with st.expander("More functions"):
-        for row_index, row in enumerate(MORE_BUTTONS):
-            columns = st.columns(len(row))
-            for column_index, (label, value) in enumerate(row):
-                columns[column_index].button(label, key=f"more_btn_{row_index}_{column_index}",
-                                             on_click=press, args=(value,), use_container_width=True)
+        <button class="key function" data-insert="asin(" aria-label="Inverse sine">sin&#x207B;&#xB9;</button>
+        <button class="key function" data-insert="acos(" aria-label="Inverse cosine">cos&#x207B;&#xB9;</button>
+        <button class="key function" data-insert="atan(" aria-label="Inverse tangent">tan&#x207B;&#xB9;</button>
+        <button class="key function" data-insert="sinh(" aria-label="Hyperbolic sine">sinh</button>
+        <button class="key function" data-insert="cosh(" aria-label="Hyperbolic cosine">cosh</button>
+        <button class="key function" data-insert="tanh(" aria-label="Hyperbolic tangent">tanh</button>
 
-    with st.expander("History"):
-        for item in reversed(st.session_state.history[-10:]):
-            st.write(item)
+        <button class="key function" data-insert="log("   aria-label="Base-10 log">log</button>
+        <button class="key function" data-insert="ln("    aria-label="Natural log">ln</button>
+        <button class="key function" data-insert="sqrt("  aria-label="Square root">&#x221A;</button>
+        <button class="key function" data-insert="exp("   aria-label="Exponential">exp</button>
+        <button class="key function" data-insert="fact("  aria-label="Factorial">n!</button>
+        <button class="key function" data-insert="abs("   aria-label="Absolute value">|x|</button>
 
-with tab2:
-    st.subheader("Trigonometric ratios")
-    unit = st.radio("Angle unit", ["Degrees", "Radians"], horizontal=True, key="trig_unit")
-    theta = st.number_input("θ =", value=30.0, key="trig_theta")
-    rad = math.radians(theta) if unit == "Degrees" else theta
-    deg = math.degrees(rad)
-    st.write(f"θ = {fmt(deg, 8)}° = {fmt(rad, 8)} rad")
+        <button class="key function" data-insert="floor(" aria-label="Floor">&#x230A;x&#x230B;</button>
+        <button class="key function" data-insert="ceil("  aria-label="Ceiling">&#x2308;x&#x2309;</button>
+        <button class="key function" data-insert="pow("   aria-label="Power">pow</button>
+        <button class="key function" data-insert="pi"     aria-label="Pi">&#x3C0;</button>
+        <button class="key function" data-insert="e"      aria-label="Euler number">e</button>
+        <button class="key function" data-insert="^"      aria-label="Power">x&#x02B8;</button>
+      </div>
 
-    trig_env = build_env("DEG" if unit == "Degrees" else "RAD")
-    sin_v, cos_v = trig_env["sin"](theta), trig_env["cos"](theta)
+      <!-- Main keypad (5 x 5) -->
+      <section class="keypad" aria-label="Calculator keys">
+        <div class="key-row">
+          <button class="key utility" data-action="clear">AC</button>
+          <button class="key utility" data-action="delete" aria-label="Delete">&#x232B;</button>
+          <button class="key function" data-insert="(">(</button>
+          <button class="key function" data-insert=")">)</button>
+          <button class="key function" data-insert="%">%</button>
+        </div>
+        <div class="key-row">
+          <button class="key" data-insert="7">7</button>
+          <button class="key" data-insert="8">8</button>
+          <button class="key" data-insert="9">9</button>
+          <button class="key operator" data-insert="/" aria-label="Divide">&#xF7;</button>
+          <button class="key operator" data-insert="*" aria-label="Multiply">&#xD7;</button>
+        </div>
+        <div class="key-row">
+          <button class="key" data-insert="4">4</button>
+          <button class="key" data-insert="5">5</button>
+          <button class="key" data-insert="6">6</button>
+          <button class="key operator" data-insert="-" aria-label="Subtract">&#x2212;</button>
+          <button class="key operator" data-insert="+" aria-label="Add">+</button>
+        </div>
+        <div class="key-row">
+          <button class="key" data-insert="1">1</button>
+          <button class="key" data-insert="2">2</button>
+          <button class="key" data-insert="3">3</button>
+          <button class="key function" data-insert="ans">ANS</button>
+          <button class="key equals" data-action="equals" aria-label="Calculate">=</button>
+        </div>
+        <div class="key-row">
+          <button class="key" data-insert="0">0</button>
+          <button class="key" data-insert=".">.</button>
+          <button class="key function" data-insert="pi">&#x3C0;</button>
+          <button class="key function" data-insert="e">e</button>
+          <button class="key utility" data-action="clear-history"
+                  aria-label="Clear history">&#x1F5D1;</button>
+        </div>
+      </section>
 
-    def ratio(num, den):
-        try:
-            return fmt(safe_div(num, den))
-        except ZeroDivisionError:
-            return "undefined"
+      <!-- History -->
+      <details class="history-wrap">
+        <summary>&#x1F4CB; History</summary>
+        <ol id="history-list"></ol>
+      </details>
+    </section>
 
-    ratio_rows = [
-        ("sin θ", fmt(sin_v)), ("cos θ", fmt(cos_v)),
-        ("tan θ", ratio(sin_v, cos_v)), ("cot θ", ratio(cos_v, sin_v)),
-        ("sec θ", ratio(1, cos_v)), ("csc θ", ratio(1, sin_v)),
-    ]
-    st.table([{"Function": name, "Value": val} for name, val in ratio_rows])
+    <!-- ════════════════════ TRIGONOMETRY TAB ════════════════════ -->
+    <section class="view view-content" id="view-trigonometry"
+             role="tabpanel" aria-labelledby="tab-trig" hidden>
+      <h1 class="view-title">Trigonometric Ratios</h1>
+      <div class="tool-row">
+        <div class="tool-field">
+          <label for="trig-angle">Angle &#x3B8;</label>
+          <input id="trig-angle" type="number" value="30" step="any">
+        </div>
+        <div class="unit-switch" role="group" aria-label="Angle unit">
+          <button type="button" data-trig-unit="DEG" aria-pressed="true">Degrees</button>
+          <button type="button" data-trig-unit="RAD" aria-pressed="false">Radians</button>
+        </div>
+      </div>
+      <div id="angle-summary" class="angle-summary"></div>
+      <table class="value-table">
+        <thead><tr><th>Function</th><th>Value</th></tr></thead>
+        <tbody id="trig-values"></tbody>
+      </table>
 
-    st.subheader("Inverse trigonometry")
-    v = st.number_input("Value v =", value=0.5, key="inv_v")
-    inverse = [("atan(v)", math.atan(v))]
-    if -1 <= v <= 1:
-        inverse = [("asin(v)", math.asin(v)), ("acos(v)", math.acos(v))] + inverse
-    else:
-        st.caption("asin aur acos sirf -1 se 1 tak ki value ke liye hote hain.")
-    st.table([{"Function": name, "Degrees": fmt(math.degrees(ang), 8),
-               "Radians": fmt(ang, 8)} for name, ang in inverse])
+      <h2 class="section-label">Inverse Trigonometry</h2>
+      <div class="tool-row">
+        <div class="tool-field">
+          <label for="inverse-value">Value v</label>
+          <input id="inverse-value" type="number" value="0.5" step="any">
+        </div>
+      </div>
+      <table class="value-table">
+        <thead><tr><th>Function</th><th>Degrees</th><th>Radians</th></tr></thead>
+        <tbody id="inverse-values"></tbody>
+      </table>
+    </section>
 
-with tab3:
-    fx = st.text_input("f(x) =", value="sin x")
-    op = st.radio("Operation",
-                  ["Derivative f'(x)", "Second derivative f''(x)", "Definite integral"],
-                  key="calc_op")
+    <!-- ══════════════════════ CALCULUS TAB ══════════════════════ -->
+    <section class="view view-content" id="view-calculus"
+             role="tabpanel" aria-labelledby="tab-calc2" hidden>
+      <h1 class="view-title">Numerical Calculus</h1>
+      <div class="tool-field">
+        <label for="calc-function">Function f(x)</label>
+        <input id="calc-function" type="text" value="sin(x)"
+               autocomplete="off" spellcheck="false">
+      </div>
+      <p class="tool-hint">
+        Use <strong>x</strong> or <strong>theta</strong> as the variable.
+        Trig functions use <strong>radians</strong> in calculus mode.
+      </p>
+      <div class="tool-row">
+        <div class="tool-field">
+          <label for="calc-op">Operation</label>
+          <select id="calc-op">
+            <option value="derivative">Derivative f'(x)</option>
+            <option value="second">Second derivative f''(x)</option>
+            <option value="integral">Definite integral</option>
+          </select>
+        </div>
+      </div>
+      <div id="calc-point-row" class="tool-row">
+        <div class="tool-field">
+          <label for="calc-point">Point x</label>
+          <input id="calc-point" type="text" value="pi/4" autocomplete="off">
+        </div>
+      </div>
+      <div id="calc-limits-row" class="tool-row" hidden>
+        <div class="tool-field">
+          <label for="calc-lower">Lower limit a</label>
+          <input id="calc-lower" type="text" value="0" autocomplete="off">
+        </div>
+        <div class="tool-field">
+          <label for="calc-upper">Upper limit b</label>
+          <input id="calc-upper" type="text" value="pi" autocomplete="off">
+        </div>
+      </div>
+      <button class="tool-button" id="calc-go" type="button">Calculate</button>
+      <output class="tool-result" id="calc-result" aria-live="polite">
+        Enter a function and press Calculate.
+      </output>
+    </section>
 
-    calc_env = build_env("RAD")
+    <footer class="calc-footer">
+      Type anywhere &middot; Enter / = to evaluate &middot; Esc to clear
+    </footer>
+  </main>
 
-    def f(v):
-        return safe_eval(fx, calc_env, {"x": v, "theta": v})
+  <script>
+  (function () {
+    "use strict";
 
-    def value_of(text):
-        return safe_eval(text, calc_env)
+    /* ─── State ─── */
+    const expr      = document.getElementById("expression");
+    const resultEl  = document.getElementById("result");
+    let   angleMode = "DEG";
+    let   justCalced = false;
+    let   lastAnswer = 0;
 
-    if op == "Definite integral":
-        a_text = st.text_input("Lower limit a", value="0")
-        b_text = st.text_input("Upper limit b", value="pi")
-    else:
-        p_text = st.text_input("Point x =", value="pi/4")
+    /* ─── Snap floating-point noise to clean values ─── */
+    function clamp(v) {
+      if (Math.abs(v)       < 1e-12) return 0;
+      if (Math.abs(v - 1)   < 1e-12) return 1;
+      if (Math.abs(v + 1)   < 1e-12) return -1;
+      if (Math.abs(v - 0.5) < 1e-12) return 0.5;
+      if (Math.abs(v + 0.5) < 1e-12) return -0.5;
+      return v;
+    }
 
-    if st.button("Calculate", key="calc_go"):
-        try:
-            if op == "Definite integral":
-                a, b = value_of(a_text), value_of(b_text)
-                answer = fmt(integrate(f, a, b), 6, 1e-8)
-                st.success(f"Integral from {a_text} to {b_text} = {answer}")
-            elif op == "Derivative f'(x)":
-                p = value_of(p_text)
-                st.success(f"f'({p_text}) = {fmt(derivative(f, p), 6, 1e-8)}")
-            else:
-                p = value_of(p_text)
-                st.success(f"f''({p_text}) = {fmt(second_derivative(f, p), 6, 1e-8)}")
-        except Exception:
-            st.error("Check the function, point, or integration limits.")
+    function fmt(v, digits) {
+      digits = digits || 12;
+      if (!Number.isFinite(v)) return String(v);
+      v = clamp(v);
+      if (v === 0) return "0";
+      return Number(v.toPrecision(digits)).toString();
+    }
 
+    /* ─── Tokeniser ─── */
+    function tokenize(src) {
+      src = src
+        .replace(/\u00d7/g, "*")   // ×
+        .replace(/\u00f7/g, "/")   // ÷
+        .replace(/\u2212/g, "-")   // −
+        .replace(/\u03c0/g, "pi")  // π
+        .replace(/\u03b8/g, "theta")
+        .replace(/\u221a/g, "sqrt ");
+      // Auto-close open parentheses
+      let open = 0;
+      for (const c of src) { if (c === "(") open++; else if (c === ")") open--; }
+      if (open > 0) src += ")".repeat(open);
+
+      const tokens = [];
+      let i = 0;
+      while (i < src.length) {
+        if (/\s/.test(src[i])) { i++; continue; }
+        const rest = src.slice(i);
+        const num  = rest.match(/^(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?/i);
+        const id   = rest.match(/^[a-z_][a-z0-9_]*/i);
+        if (num) {
+          tokens.push({ t: "num", v: Number(num[0]) });
+          i += num[0].length;
+        } else if (id) {
+          tokens.push({ t: "id", v: id[0].toLowerCase() });
+          i += id[0].length;
+        } else if ("+-*/^%(),!".includes(src[i])) {
+          tokens.push({ t: src[i], v: src[i] });
+          i++;
+        } else {
+          throw new Error('Unexpected character: "' + src[i] + '"');
+        }
+      }
+      return tokens;
+    }
+
+    /* ─── Evaluator ─── */
+    var FUNCS = new Set([
+      "sin","cos","tan","cot","sec","csc",
+      "asin","acos","atan","acot",
+      "sinh","cosh","tanh","asinh","acosh","atanh",
+      "sqrt","log","ln","exp","fact","abs","floor","ceil",
+      "pow","radians","degrees"
+    ]);
+
+    function factorial(n) {
+      if (!Number.isInteger(n) || n < 0 || n > 170)
+        throw new Error("Factorial is only defined for integers 0 – 170.");
+      var r = 1;
+      for (var k = 2; k <= n; k++) r *= k;
+      return r;
+    }
+
+    function applyFn(name, a, b, mode) {
+      var toRad    = mode === "DEG" ? a * Math.PI / 180 : a;
+      var fromRad  = function(v) { return mode === "DEG" ? v * 180 / Math.PI : v; };
+      var safeDiv  = function(num, den) {
+        if (Math.abs(den) < 1e-12)
+          throw new Error(name + " is undefined at this value.");
+        return num / den;
+      };
+      switch (name) {
+        case "sin":     return clamp(Math.sin(toRad));
+        case "cos":     return clamp(Math.cos(toRad));
+        case "tan":     return clamp(safeDiv(Math.sin(toRad), Math.cos(toRad)));
+        case "cot":     return clamp(safeDiv(Math.cos(toRad), Math.sin(toRad)));
+        case "sec":     return clamp(safeDiv(1, Math.cos(toRad)));
+        case "csc":     return clamp(safeDiv(1, Math.sin(toRad)));
+        case "asin":    return fromRad(Math.asin(a));
+        case "acos":    return fromRad(Math.acos(a));
+        case "atan":    return fromRad(Math.atan(a));
+        case "acot":    return fromRad(Math.atan2(1, a));
+        case "sinh":    return Math.sinh(a);
+        case "cosh":    return Math.cosh(a);
+        case "tanh":    return Math.tanh(a);
+        case "asinh":   return Math.asinh(a);
+        case "acosh":   return Math.acosh(a);
+        case "atanh":   return Math.atanh(a);
+        case "sqrt":    return Math.sqrt(a);
+        case "log":     return Math.log10(a);
+        case "ln":      return Math.log(a);
+        case "exp":     return Math.exp(a);
+        case "fact":    return factorial(a);
+        case "abs":     return Math.abs(a);
+        case "floor":   return Math.floor(a);
+        case "ceil":    return Math.ceil(a);
+        case "pow":
+          if (b === undefined)
+            throw new Error("pow(base, exponent) needs two arguments.");
+          return Math.pow(a, b);
+        case "radians": return a * Math.PI / 180;
+        case "degrees": return a * 180 / Math.PI;
+        default: throw new Error("Unknown function: " + name);
+      }
+    }
+
+    function evaluate(src, vars, mode) {
+      vars = vars || {};
+      mode = mode !== undefined ? mode : angleMode;
+      var tokens  = tokenize(src);
+      var pos     = 0;
+      var peek    = function()     { return tokens[pos]; };
+      var take    = function(type) {
+        if (!peek() || peek().t !== type)
+          throw new Error('Expected "' + type + '".');
+        return tokens[pos++];
+      };
+      var startsVal = function(tk) {
+        return tk && ["num", "id", "("].indexOf(tk.t) !== -1;
+      };
+
+      function parseExpr() {
+        var v = parseTerm();
+        while (peek() && (peek().t === "+" || peek().t === "-")) {
+          var op = tokens[pos++].t;
+          var r  = parseTerm();
+          v = op === "+" ? v + r : v - r;
+        }
+        return v;
+      }
+      function parseTerm() {
+        var v = parseUnary();
+        while (peek() && (peek().t === "*" || peek().t === "/" || startsVal(peek()))) {
+          var op = (peek().t === "*" || peek().t === "/") ? tokens[pos++].t : "*";
+          var r  = parseUnary();
+          if (op === "/" && r === 0) throw new Error("Division by zero.");
+          v = op === "*" ? v * r : v / r;
+        }
+        return v;
+      }
+      function parseUnary() {
+        if (peek() && peek().t === "+") { pos++; return parseUnary(); }
+        if (peek() && peek().t === "-") { pos++; return -parseUnary(); }
+        return parsePower();
+      }
+      function parsePower() {
+        var v = parsePrimary();
+        if (peek() && peek().t === "^") {
+          pos++;
+          v = Math.pow(v, parseUnary());
+        }
+        while (peek() && (peek().t === "%" || peek().t === "!")) {
+          var op = tokens[pos++].t;
+          v = op === "%" ? v / 100 : factorial(v);
+        }
+        return v;
+      }
+      function parsePrimary() {
+        var tk = peek();
+        if (!tk) throw new Error("Unexpected end of expression.");
+        if (tk.t === "num")  { pos++; return tk.v; }
+        if (tk.t === "(") {
+          pos++;
+          var v = parseExpr();
+          take(")");
+          return v;
+        }
+        if (tk.t === "id") {
+          pos++;
+          if (tk.v === "pi")  return Math.PI;
+          if (tk.v === "e")   return Math.E;
+          if (tk.v === "ans") return lastAnswer;
+          if (Object.prototype.hasOwnProperty.call(vars, tk.v)) return vars[tk.v];
+          if (!FUNCS.has(tk.v)) throw new Error('Unknown name: "' + tk.v + '"');
+          var a, b;
+          if (peek() && peek().t === "(") {
+            pos++;
+            a = parseExpr();
+            if (peek() && peek().t === ",") { pos++; b = parseExpr(); }
+            take(")");
+          } else {
+            a = parseUnary();
+          }
+          return applyFn(tk.v, a, b, mode);
+        }
+        throw new Error('Unexpected token "' + tk.v + '".');
+      }
+
+      if (tokens.length === 0) throw new Error("Enter an expression.");
+      var result = parseExpr();
+      if (pos !== tokens.length)
+        throw new Error("Check parentheses and operators.");
+      if (!Number.isFinite(result))
+        throw new Error("Result is out of range.");
+      return result;
+    }
+
+    /* ─── Display ─── */
+    function showResult() {
+      var src = expr.value.trim();
+      if (!src) { resultEl.textContent = ""; resultEl.className = "result-line"; return; }
+      try {
+        var v = evaluate(src);
+        resultEl.textContent = "= " + fmt(v);
+        resultEl.className = "result-line";
+      } catch (err) {
+        resultEl.textContent = err.message;
+        resultEl.className = "result-line error";
+      }
+    }
+
+    function insert(val) {
+      if (justCalced && /^[0-9.(a-z]/i.test(val)) expr.value = "";
+      var s = expr.selectionStart != null ? expr.selectionStart : expr.value.length;
+      var e = expr.selectionEnd   != null ? expr.selectionEnd   : s;
+      expr.setRangeText(val, s, e, "end");
+      justCalced = false;
+      showResult();
+      expr.focus({ preventScroll: true });
+    }
+
+    function calculate() {
+      showResult();
+      if (!resultEl.classList.contains("error") && resultEl.textContent) {
+        var orig = expr.value;
+        try {
+          lastAnswer = evaluate(orig);
+          expr.value = fmt(lastAnswer);
+          resultEl.textContent = "= " + expr.value;
+          var li   = document.createElement("li");
+          li.textContent = orig + " = " + expr.value;
+          var list = document.getElementById("history-list");
+          list.prepend(li);
+          while (list.children.length > 20) list.lastElementChild.remove();
+          justCalced = true;
+        } catch (_) { /* already shown */ }
+      }
+      expr.focus({ preventScroll: true });
+    }
+
+    function clearExpr() {
+      expr.value = "";
+      resultEl.textContent = "";
+      resultEl.className = "result-line";
+      justCalced = false;
+      expr.focus({ preventScroll: true });
+    }
+
+    /* ─── Button wiring ─── */
+    document.querySelectorAll("[data-insert]").forEach(function(btn) {
+      btn.addEventListener("click", function() { insert(btn.dataset.insert); });
+    });
+    document.querySelectorAll('[data-action="clear"]').forEach(function(btn) {
+      btn.addEventListener("click", clearExpr);
+    });
+    document.querySelectorAll('[data-action="clear-history"]').forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        document.getElementById("history-list").replaceChildren();
+        expr.focus({ preventScroll: true });
+      });
+    });
+    document.querySelector('[data-action="delete"]').addEventListener("click", function() {
+      var s = expr.selectionStart != null ? expr.selectionStart : expr.value.length;
+      var e = expr.selectionEnd   != null ? expr.selectionEnd   : s;
+      if (s !== e) expr.setRangeText("", s, e, "end");
+      else if (s > 0) expr.setRangeText("", s - 1, s, "end");
+      justCalced = false;
+      showResult();
+      expr.focus({ preventScroll: true });
+    });
+    document.querySelector('[data-action="equals"]').addEventListener("click", calculate);
+
+    /* DEG / RAD */
+    document.querySelectorAll("[data-mode]").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        angleMode = btn.dataset.mode;
+        document.querySelectorAll("[data-mode]").forEach(function(b) {
+          b.setAttribute("aria-pressed", String(b === btn));
+        });
+        showResult();
+        expr.focus({ preventScroll: true });
+      });
+    });
+
+    expr.addEventListener("input", function() { justCalced = false; showResult(); });
+
+    /* ─── Global keyboard support ─── */
+    document.addEventListener("keydown", function(ev) {
+      if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+      var active = document.activeElement;
+      if (active && active !== expr &&
+          active.matches("input, textarea, select")) return;
+      var calcPanel = document.getElementById("view-calculator");
+      if (calcPanel.hidden && ev.key !== "Escape") return;
+
+      if (ev.key === "Enter" || ev.key === "=") {
+        ev.preventDefault(); calculate(); return;
+      }
+      if (ev.key === "Escape") {
+        ev.preventDefault(); clearExpr(); return;
+      }
+      if (ev.key === "Backspace" && active !== expr) {
+        ev.preventDefault();
+        var s = expr.value.length;
+        if (s > 0) expr.setRangeText("", s - 1, s, "end");
+        showResult();
+        expr.focus({ preventScroll: true }); return;
+      }
+      if (active !== expr && /^[0-9a-z.+\-*/%^()!,]$/i.test(ev.key)) {
+        ev.preventDefault(); insert(ev.key);
+      }
+    });
+
+    /* ─── Tab switching ─── */
+    document.querySelectorAll("[data-view]").forEach(function(tab) {
+      tab.addEventListener("click", function() {
+        document.querySelectorAll("[data-view]").forEach(function(t) {
+          t.setAttribute("aria-selected", String(t === tab));
+        });
+        document.querySelectorAll(".view").forEach(function(panel) {
+          panel.hidden = (panel.id !== "view-" + tab.dataset.view);
+        });
+        if (tab.dataset.view === "calculator")
+          expr.focus({ preventScroll: true });
+        if (tab.dataset.view === "trigonometry") updateTrig();
+      });
+    });
+
+    /* ══════════════════════ TRIGONOMETRY TAB ════════════════════ */
+    var trigUnit = "DEG";
+
+    function updateTrig() {
+      var raw   = Number(document.getElementById("trig-angle").value);
+      var sumEl = document.getElementById("angle-summary");
+      var tbody = document.getElementById("trig-values");
+      if (!Number.isFinite(raw)) {
+        sumEl.textContent = "Enter a valid angle.";
+        tbody.replaceChildren();
+        return;
+      }
+      var rad = trigUnit === "DEG" ? raw * Math.PI / 180 : raw;
+      var deg = rad * 180 / Math.PI;
+      sumEl.textContent = "\u03B8 = " + fmt(deg, 8) + "\u00B0 = " + fmt(rad, 8) + " rad";
+      tbody.replaceChildren();
+
+      var sinv = clamp(Math.sin(rad));
+      var cosv = clamp(Math.cos(rad));
+      var safeStr = function(n, d) {
+        return Math.abs(d) < 1e-12 ? "undefined" : fmt(n / d, 8);
+      };
+      var pairs = [
+        ["sin \u03B8", fmt(sinv, 8)],
+        ["cos \u03B8", fmt(cosv, 8)],
+        ["tan \u03B8", safeStr(sinv, cosv)],
+        ["cot \u03B8", safeStr(cosv, sinv)],
+        ["sec \u03B8", safeStr(1, cosv)],
+        ["csc \u03B8", safeStr(1, sinv)],
+      ];
+      pairs.forEach(function(pair) {
+        var tr  = document.createElement("tr");
+        var td1 = document.createElement("td"); td1.textContent = pair[0];
+        var td2 = document.createElement("td"); td2.textContent = pair[1];
+        tr.append(td1, td2);
+        tbody.append(tr);
+      });
+
+      /* Inverse */
+      var v2    = Number(document.getElementById("inverse-value").value);
+      var ibody = document.getElementById("inverse-values");
+      ibody.replaceChildren();
+      if (!Number.isFinite(v2)) return;
+      var inv = [];
+      if (v2 >= -1 && v2 <= 1)
+        inv.push(["asin(v)", Math.asin(v2)], ["acos(v)", Math.acos(v2)]);
+      inv.push(["atan(v)", Math.atan(v2)], ["acot(v)", Math.atan2(1, v2)]);
+      inv.forEach(function(item) {
+        var label = item[0], angle = item[1];
+        var tr = document.createElement("tr");
+        [label, fmt(angle * 180 / Math.PI, 8), fmt(angle, 8)].forEach(function(txt) {
+          var td = document.createElement("td"); td.textContent = txt; tr.append(td);
+        });
+        ibody.append(tr);
+      });
+    }
+
+    document.querySelectorAll("[data-trig-unit]").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        trigUnit = btn.dataset.trigUnit;
+        document.querySelectorAll("[data-trig-unit]").forEach(function(b) {
+          b.setAttribute("aria-pressed", String(b === btn));
+        });
+        updateTrig();
+      });
+    });
+    document.getElementById("trig-angle").addEventListener("input", updateTrig);
+    document.getElementById("inverse-value").addEventListener("input", updateTrig);
+    updateTrig();
+
+    /* ══════════════════════ CALCULUS TAB ════════════════════════ */
+    function numericalDerivative(fn, x, h) {
+      h = h || 1e-4;
+      return (-fn(x + 2*h) + 8*fn(x + h) - 8*fn(x - h) + fn(x - 2*h)) / (12 * h);
+    }
+    function secondDerivative(fn, x, h) {
+      h = h || 1e-4;
+      return (fn(x + h) - 2*fn(x) + fn(x - h)) / (h * h);
+    }
+    function simpsonsRule(fn, a, b, n) {
+      n = n || 2000;
+      var h = (b - a) / n;
+      var total = fn(a) + fn(b);
+      for (var i = 1; i < n; i++)
+        total += (i % 2 ? 4 : 2) * fn(a + i * h);
+      return total * h / 3;
+    }
+
+    document.getElementById("calc-op").addEventListener("change", function(ev) {
+      var integral = ev.target.value === "integral";
+      document.getElementById("calc-point-row").hidden  =  integral;
+      document.getElementById("calc-limits-row").hidden = !integral;
+    });
+
+    document.getElementById("calc-go").addEventListener("click", function() {
+      var out = document.getElementById("calc-result");
+      var src = document.getElementById("calc-function").value.trim();
+      var op  = document.getElementById("calc-op").value;
+      try {
+        var fn = function(v) { return evaluate(src, { x: v, theta: v }, "RAD"); };
+        var answer;
+        if (op === "integral") {
+          var aText = document.getElementById("calc-lower").value;
+          var bText = document.getElementById("calc-upper").value;
+          var a = evaluate(aText, {}, "RAD");
+          var b = evaluate(bText, {}, "RAD");
+          answer = "Integral from " + aText + " to " + bText +
+                   " = " + fmt(simpsonsRule(fn, a, b), 8);
+        } else {
+          var pText = document.getElementById("calc-point").value;
+          var p     = evaluate(pText, {}, "RAD");
+          var val   = op === "derivative"
+                      ? numericalDerivative(fn, p)
+                      : secondDerivative(fn, p);
+          var lbl   = op === "derivative" ? "f'" : "f''";
+          answer = lbl + "(" + pText + ") = " + fmt(val, 8);
+        }
+        out.textContent = answer;
+        out.className = "tool-result";
+      } catch (err) {
+        out.textContent = err.message || "Check function and limits.";
+        out.className = "tool-result error";
+      }
+    });
+
+    window.addEventListener("load", function() {
+      expr.focus({ preventScroll: true });
+    });
+  })();
+  </script>
+</body>
+</html>"""
+
+# ---------------------------------------------------------------------------
+# Render the calculator (no external files needed)
+# ---------------------------------------------------------------------------
+components.html(CALCULATOR_HTML, height=1080, scrolling=True)
